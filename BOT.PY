@@ -1,23 +1,28 @@
 import discord
-from discord.ext import commands, tasks
+from discord.ext import commands
 from discord import app_commands
 import json
 import os
 from collections import defaultdict
+from datetime import timedelta
 
 # =========================
-# 🔐 TOKEN
+# 🔐 TOKEN (FIX REAL)
 # =========================
 TOKEN = os.getenv("DISCORD_TOKEN")
 
+# 🔥 FIX: evita crash si no hay token
+if not TOKEN:
+    raise ValueError("❌ No se encontró DISCORD_TOKEN en variables de entorno")
+
 # =========================
-# 🤖 INTENTS (FIX ONLINE + AUTOROLE)
+# 🤖 INTENTS
 # =========================
 intents = discord.Intents.default()
 intents.members = True
 intents.message_content = True
 intents.guilds = True
-intents.presences = True  # 🔥 FIX ONLINE
+intents.presences = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
@@ -33,8 +38,7 @@ def load():
     except:
         return {
             "warns": {},
-            "autoroles": {"user": None, "bot": None},
-            "joins": {}
+            "autoroles": {"user": None, "bot": None}
         }
 
 def save():
@@ -59,28 +63,25 @@ async def on_ready():
     try:
         await bot.tree.sync()
         print("Slash commands listos")
-    except:
-        pass
+    except Exception as e:
+        print("Slash error:", e)
 
 # =========================
-# 👋 WELCOME (TU ORIGINAL)
+# 👋 WELCOME (NO TOCADO)
 # =========================
 @bot.event
 async def on_member_join(member):
 
-    # ===== AUTOROLE FIX =====
     role_id = data["autoroles"].get("bot") if member.bot else data["autoroles"].get("user")
 
     if role_id:
         role = member.guild.get_role(role_id)
-
         if role:
             try:
-                await member.add_roles(role)
-            except:
-                pass
+                await member.add_roles(role, reason="Autorole system")
+            except Exception as e:
+                print("Autorole error:", e)
 
-    # ===== WELCOME (NO TOCADO, SOLO OPTIMIZADO) =====
     channel = member.guild.get_channel(1500703841518223375)
 
     if channel:
@@ -100,20 +101,22 @@ Welcome {member.mention} to MIEMBROS GUATE XITER!
             color=0xff0000
         )
 
-        embed.set_image(
-            url="https://images-ext-1.discordapp.net/external/ch2lkaZJmmSwYBMyGG-Iqo2tZSdovpxc5kxVD6nheAo/https/i.postimg.cc/nV2JGZmr/file-00000000c9ec71f59259d589e645e4e1.png"
-        )
+        embed.set_image(url="https://images-ext-1.discordapp.net/external/ch2lkaZJmmSwYBMyGG-Iqo2tZSdovpxc5kxVD6nheAo/https/i.postimg.cc/nV2JGZmr/file-00000000c9ec71f59259d589e645e4e1.png")
 
         await channel.send(content=member.mention, embed=embed)
 
 # =========================
-# 📊 INFO (FIX ONLINE)
+# 📊 INFO (FIX ONLINE REAL)
 # =========================
 @bot.command()
 async def info(ctx):
     g = ctx.guild
 
-    online = len([m for m in g.members if str(m.status) != "offline"])
+    online = sum(
+        1 for m in g.members
+        if m.status in (discord.Status.online, discord.Status.idle, discord.Status.dnd)
+    )
+
     bots = sum(1 for m in g.members if m.bot)
 
     await ctx.send(f"""
@@ -128,7 +131,10 @@ async def info(ctx):
 
 @bot.command()
 async def online(ctx):
-    online = len([m for m in ctx.guild.members if str(m.status) != "offline"])
+    online = sum(
+        1 for m in ctx.guild.members
+        if m.status in (discord.Status.online, discord.Status.idle, discord.Status.dnd)
+    )
     await ctx.send(f"🟢 Online: {online}")
 
 # =========================
@@ -159,7 +165,7 @@ async def warns(ctx, member: discord.Member):
     await ctx.send(f"⚠️ Warns de {member.mention}\n{text}")
 
 # =========================
-# 🎭 AUTOROLE SET
+# 🎭 AUTOROLE
 # =========================
 @bot.command()
 async def setautorole(ctx, tipo, role: discord.Role):
@@ -249,7 +255,10 @@ class Panel(discord.ui.View):
     async def info(self, interaction, button):
 
         g = interaction.guild
-        online = len([m for m in g.members if str(m.status) != "offline"])
+        online = sum(
+            1 for m in g.members
+            if m.status in (discord.Status.online, discord.Status.idle, discord.Status.dnd)
+        )
 
         await interaction.response.send_message(f"""
 📊 PANEL
@@ -267,29 +276,36 @@ async def panel(ctx):
 # =========================
 # 💀 SLASH COMMANDS
 # =========================
-
-@bot.tree.command(name="ban", description="Banear usuario")
+@bot.tree.command(name="ban")
 @app_commands.checks.has_permissions(ban_members=True)
 async def ban(interaction: discord.Interaction, member: discord.Member, reason: str = "sin razón"):
     await member.ban(reason=reason)
     await interaction.response.send_message(f"🔨 Baneado {member}")
 
-@bot.tree.command(name="kick", description="Expulsar usuario")
+@bot.tree.command(name="kick")
 @app_commands.checks.has_permissions(kick_members=True)
 async def kick(interaction: discord.Interaction, member: discord.Member):
     await member.kick()
     await interaction.response.send_message(f"👢 Kick {member}")
 
-@bot.tree.command(name="timeout", description="Mute temporal")
+@bot.tree.command(name="timeout")
 @app_commands.checks.has_permissions(moderate_members=True)
 async def timeout(interaction: discord.Interaction, member: discord.Member, minutes: int):
-    await member.timeout(discord.utils.utcnow() + discord.timedelta(minutes=minutes))
+
+    await member.timeout(
+        discord.utils.utcnow() + timedelta(minutes=minutes)
+    )
+
     await interaction.response.send_message(f"⏱️ Muted {member}")
 
-@bot.tree.command(name="info", description="Info server")
+@bot.tree.command(name="info")
 async def info_slash(interaction: discord.Interaction):
     g = interaction.guild
-    online = len([m for m in g.members if str(m.status) != "offline"])
+
+    online = sum(
+        1 for m in g.members
+        if m.status in (discord.Status.online, discord.Status.idle, discord.Status.dnd)
+    )
 
     await interaction.response.send_message(
         f"👥 {g.member_count}\n🟢 {online}\n👑 {len(g.roles)}"
