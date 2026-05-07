@@ -1,23 +1,28 @@
 import discord
 from discord.ext import commands, tasks
+from discord import app_commands
 import json
 import time
 import os
 from collections import defaultdict
 
 # =========================
-# 🔐 TOKEN SEGURO
+# 🔐 TOKEN
 # =========================
 TOKEN = os.getenv("DISCORD_TOKEN")
 
 # =========================
-# 🤖 BOT
+# 🤖 INTENTS (FIX TOTAL)
 # =========================
-intents = discord.Intents.all()
+intents = discord.Intents.default()
+intents.members = True
+intents.message_content = True
+intents.guilds = True
+
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 # =========================
-# 💾 DATABASE JSON
+# 💾 DATA
 # =========================
 FILE = "data.json"
 
@@ -39,11 +44,11 @@ def save(data):
 data = load()
 
 # =========================
-# 🧠 ANTI-SPAM + XP
+# 📊 SYSTEMS
 # =========================
-user_messages = defaultdict(list)
 xp = defaultdict(int)
 level = defaultdict(int)
+user_messages = defaultdict(list)
 muted = {}
 
 # =========================
@@ -54,12 +59,18 @@ async def on_ready():
     print(f"Bot activo como {bot.user}")
 
     try:
+        await bot.tree.sync()
+        print("Slash commands listos")
+    except:
+        pass
+
+    try:
         unmute_loop.start()
     except:
         pass
 
 # =========================
-# 🧠 ANTI-SPAM + XP
+# 🧠 XP + ANTI SPAM
 # =========================
 @bot.event
 async def on_message(message):
@@ -67,144 +78,82 @@ async def on_message(message):
         return
 
     uid = str(message.author.id)
-    now = time.time()
-
-    # ================= ANTI-SPAM =================
-    user_messages[uid].append(now)
-    user_messages[uid] = [t for t in user_messages[uid] if now - t < 5]
-
-    if len(user_messages[uid]) > 5:
-        muted[uid] = now
-
-        role = discord.utils.get(message.guild.roles, name="Muted")
-
-        if role:
-            try:
-                await message.author.add_roles(role)
-            except:
-                pass
-
-        await message.channel.send(
-            f"🧠 Anti-spam: {message.author.mention} muteado"
-        )
-
-    # ================= XP SYSTEM =================
     xp[uid] += 5
 
     if xp[uid] >= (level[uid] + 1) * 100:
         level[uid] += 1
-
-        await message.channel.send(
-            f"📈 {message.author.mention} subió a nivel {level[uid]} 🔥"
-        )
+        await message.channel.send(f"📈 {message.author.mention} subió a nivel {level[uid]} 🔥")
 
     await bot.process_commands(message)
 
 # =========================
-# 🔓 UNMUTE LOOP
-# =========================
-@tasks.loop(seconds=30)
-async def unmute_loop():
-    now = time.time()
-
-    for uid, t in list(muted.items()):
-        if now - t > 300:
-            muted.pop(uid, None)
-
-# =========================
-# 👋 WELCOME + AUTOROLE + ANTI RAID
+# 👋 WELCOME + AUTOROLE FIX
 # =========================
 @bot.event
 async def on_member_join(member):
-    gid = str(member.guild.id)
 
-    # ================= ANTI RAID =================
-    now = time.time()
-
-    data["joins"].setdefault(gid, [])
-    data["joins"][gid].append(now)
-
-    data["joins"][gid] = [
-        t for t in data["joins"][gid]
-        if now - t < 10
-    ]
-
-    if len(data["joins"][gid]) > 5:
-        channel = discord.utils.get(
-            member.guild.text_channels,
-            name="logs"
-        )
-
-        if channel:
-            await channel.send("🛡️ Anti-raid activado")
-
-        return
-
-    # ================= AUTOROLE =================
-    role_id = (
-        data["autoroles"]["bot"]
-        if member.bot
-        else data["autoroles"]["user"]
-    )
+    # ===== AUTOROLE =====
+    role_id = data["autoroles"]["bot"] if member.bot else data["autoroles"]["user"]
 
     if role_id:
         role = member.guild.get_role(role_id)
-
         if role:
             try:
                 await member.add_roles(role)
             except:
                 pass
 
-    # ================= WELCOME =================
-    channel = discord.utils.get(
-        member.guild.text_channels,
-        name="welcome"
-    )
+    # ===== WELCOME (CANAL POR ID) =====
+    channel = member.guild.get_channel(1500703841518223375)
 
     if channel:
         embed = discord.Embed(
-            title="🔥 Bienvenido 🔥",
-            description=f"{member.mention}",
+            title="🔥 Bienvenido a Guate Xiter 🔥",
+            description=f"""
+Welcome {member.mention} to MIEMBROS GUATE XITER!
+
+🔥 Somos familia 💯  
+🚀 Aquí se sube todo  
+🏆 Aquí se domina  
+💀 Aquí no hay debilidad  
+
+⚔️ Siempre activos  
+🤝 Siempre en equipo  
+""",
             color=0xff0000
         )
 
-        await channel.send(embed=embed)
+        embed.set_image(url="https://images-ext-1.discordapp.net/external/ch2lkaZJmmSwYBMyGG-Iqo2tZSdovpxc5kxVD6nheAo/https/i.postimg.cc/nV2JGZmr/file-00000000c9ec71f59259d589e645e4e1.png")
+
+        await channel.send(content=member.mention, embed=embed)
 
 # =========================
-# 📊 LOGS
+# 📊 INFO
 # =========================
-async def log(guild, msg):
-    channel = discord.utils.get(
-        guild.text_channels,
-        name="logs"
-    )
+@bot.command()
+async def info(ctx):
+    g = ctx.guild
 
-    if channel:
-        await channel.send(msg)
+    online = sum(1 for m in g.members if m.status != discord.Status.offline)
+    bots = sum(1 for m in g.members if m.bot)
 
-@bot.event
-async def on_message_delete(message):
-    if message.guild:
-        await log(
-            message.guild,
-            f"🗑️ {message.author}: {message.content}"
-        )
+    await ctx.send(f"""
+📊 INFO SERVER
 
-@bot.event
-async def on_message_edit(before, after):
-    if before.guild:
-        await log(
-            before.guild,
-            f"✏️ {before.author}: {before.content} → {after.content}"
-        )
+👥 Miembros: {g.member_count}
+🟢 Online: {online}
+🤖 Bots: {bots}
+💬 Canales: {len(g.channels)}
+👑 Roles: {len(g.roles)}
+""")
 
-@bot.event
-async def on_member_remove(member):
-    await log(member.guild, f"👋 salió {member}")
+@bot.command()
+async def online(ctx):
+    online = sum(1 for m in ctx.guild.members if m.status != discord.Status.offline)
+    await ctx.send(f"🟢 Online: {online}")
 
 # =========================
-# ⚠️ WARNS
+# ⚠️ WARN SYSTEM
 # =========================
 @bot.command()
 async def warn(ctx, member: discord.Member, *, reason="sin razón"):
@@ -224,84 +173,51 @@ async def warns(ctx, member: discord.Member):
     warns_list = data["warns"].get(uid, [])
 
     if not warns_list:
-        await ctx.send("✅ Sin warns")
-        return
+        return await ctx.send("✅ Sin warns")
 
-    texto = "\n".join(
-        [f"{i+1}. {w}" for i, w in enumerate(warns_list)]
-    )
+    text = "\n".join([f"{i+1}. {w}" for i, w in enumerate(warns_list)])
 
-    await ctx.send(f"⚠️ Warns de {member.mention}\n{texto}")
+    await ctx.send(f"⚠️ Warns de {member.mention}\n{text}")
 
 # =========================
-# 🎭 AUTOROLE
+# 🎭 AUTOROLE SET
 # =========================
 @bot.command()
 async def setautorole(ctx, tipo, role: discord.Role):
+
     tipo = tipo.lower()
 
     if tipo not in ["user", "bot"]:
-        await ctx.send("❌ usa user o bot")
-        return
+        return await ctx.send("❌ usa user o bot")
 
     data["autoroles"][tipo] = role.id
-
     save(data)
 
-    await ctx.send("✅ guardado")
+    await ctx.send("✅ Autorole guardado")
 
 # =========================
 # 🧹 CLEAR
 # =========================
 @bot.command()
-@commands.has_permissions(manage_messages=True)
 async def clear(ctx, amount: int):
     await ctx.channel.purge(limit=amount)
-
-    await ctx.send(
-        f"🧹 {amount} mensajes eliminados",
-        delete_after=3
-    )
+    await ctx.send(f"🧹 {amount} eliminados", delete_after=3)
 
 # =========================
-# 🗑️ DELETE CHANNEL
-# =========================
-@bot.command()
-@commands.has_permissions(manage_channels=True)
-async def delchannel(ctx):
-    await ctx.channel.delete()
-
-# =========================
-# 🚨 LOCKDOWN
+# 🔒 LOCKDOWN
 # =========================
 @bot.command()
 async def lockdown(ctx):
-    overwrite = ctx.channel.overwrites_for(
-        ctx.guild.default_role
-    )
-
+    overwrite = ctx.channel.overwrites_for(ctx.guild.default_role)
     overwrite.send_messages = False
-
-    await ctx.channel.set_permissions(
-        ctx.guild.default_role,
-        overwrite=overwrite
-    )
-
+    await ctx.channel.set_permissions(ctx.guild.default_role, overwrite=overwrite)
     await ctx.send("🔒 lock")
 
 @bot.command()
 async def unlock(ctx):
-    overwrite = ctx.channel.overwrites_for(
-        ctx.guild.default_role
-    )
-
+    overwrite = ctx.channel.overwrites_for(ctx.guild.default_role)
     overwrite.send_messages = True
-
-    await ctx.channel.set_permissions(
-        ctx.guild.default_role,
-        overwrite=overwrite
-    )
-
+    await ctx.channel.set_permissions(ctx.guild.default_role, overwrite=overwrite)
     await ctx.send("🔓 unlock")
 
 # =========================
@@ -310,46 +226,7 @@ async def unlock(ctx):
 @bot.command()
 async def avatar(ctx, member: discord.Member = None):
     member = member or ctx.author
-
     await ctx.send(member.display_avatar.url)
-
-# =========================
-# 📊 INFO + ONLINE
-# =========================
-@bot.command()
-async def info(ctx):
-    g = ctx.guild
-
-    online = sum(
-        1 for m in g.members
-        if m.status != discord.Status.offline
-    )
-
-    bots = sum(
-        1 for m in g.members
-        if m.bot
-    )
-
-    await ctx.send(
-        f"""
-📊 INFO SERVER
-
-👥 Miembros: {g.member_count}
-🟢 Online: {online}
-🤖 Bots: {bots}
-💬 Canales: {len(g.channels)}
-👑 Roles: {len(g.roles)}
-"""
-    )
-
-@bot.command()
-async def online(ctx):
-    online = sum(
-        1 for m in ctx.guild.members
-        if m.status != discord.Status.offline
-    )
-
-    await ctx.send(f"🟢 Online: {online}")
 
 # =========================
 # 📈 RANK
@@ -357,87 +234,65 @@ async def online(ctx):
 @bot.command()
 async def rank(ctx, member: discord.Member = None):
     member = member or ctx.author
-
     uid = str(member.id)
 
-    await ctx.send(
-        f"""
+    await ctx.send(f"""
 📈 Rank de {member}
 
 XP: {xp[uid]}
 Nivel: {level[uid]}
-"""
-    )
+""")
 
 # =========================
-# 👑 VERIFICACIÓN
+# 👑 VERIFY (BUTTON)
 # =========================
 class Verify(discord.ui.View):
 
-    @discord.ui.button(
-        label="Verificar",
-        style=discord.ButtonStyle.green
-    )
-    async def verify_button(self, interaction, button):
+    @discord.ui.button(label="Verificar", style=discord.ButtonStyle.green)
+    async def verify(self, interaction, button):
 
-        role = discord.utils.get(
-            interaction.guild.roles,
-            name="Verificado"
-        )
+        role = discord.utils.get(interaction.guild.roles, name="Verificado")
 
         if role:
             await interaction.user.add_roles(role)
-
-            await interaction.response.send_message(
-                "✔ verificado",
-                ephemeral=True
-            )
+            await interaction.response.send_message("✔ verificado", ephemeral=True)
 
 @bot.command()
 async def verify(ctx):
-    await ctx.send(
-        "👑 Presiona para verificarte",
-        view=Verify()
-    )
+    await ctx.send("👑 Verifícate", view=Verify())
 
 # =========================
 # 📌 PANEL
 # =========================
 class Panel(discord.ui.View):
 
-    @discord.ui.button(
-        label="Info",
-        style=discord.ButtonStyle.blurple
-    )
-    async def info_button(self, interaction, button):
+    @discord.ui.button(label="Info", style=discord.ButtonStyle.blurple)
+    async def info(self, interaction, button):
 
         g = interaction.guild
+        online = sum(1 for m in g.members if m.status != discord.Status.offline)
 
-        online = sum(
-            1 for m in g.members
-            if m.status != discord.Status.offline
-        )
+        await interaction.response.send_message(f"""
+📊 PANEL
 
-        await interaction.response.send_message(
-            f"""
-📊 PANEL SERVER
-
-👥 Miembros: {g.member_count}
-🟢 Online: {online}
-👑 Roles: {len(g.roles)}
-💬 Canales: {len(g.channels)}
-""",
-            ephemeral=True
-        )
+👥 {g.member_count}
+🟢 {online}
+👑 {len(g.roles)}
+💬 {len(g.channels)}
+""", ephemeral=True)
 
 @bot.command()
 async def panel(ctx):
-    await ctx.send(
-        "📌 Panel del servidor",
-        view=Panel()
-    )
+    await ctx.send("📌 Panel", view=Panel())
 
 # =========================
-# 🚀 START
+# 🔓 LOOP
+# =========================
+@tasks.loop(seconds=30)
+async def unmute_loop():
+    pass
+
+# =========================
+# 🚀 RUN
 # =========================
 bot.run(TOKEN)
