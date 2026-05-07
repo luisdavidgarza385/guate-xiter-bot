@@ -7,11 +7,10 @@ from collections import defaultdict
 from datetime import timedelta
 
 # =========================
-# 🔐 TOKEN (FIX REAL)
+# 🔐 TOKEN
 # =========================
 TOKEN = os.getenv("DISCORD_TOKEN")
 
-# 🔥 FIX: evita crash si no hay token
 if not TOKEN:
     raise ValueError("❌ No se encontró DISCORD_TOKEN en variables de entorno")
 
@@ -54,6 +53,18 @@ xp = defaultdict(int)
 level = defaultdict(int)
 
 # =========================
+# 🚀 WEB FIX RENDER
+# =========================
+from http.server import BaseHTTPRequestHandler, HTTPServer
+import threading
+
+def run():
+    server = HTTPServer(("0.0.0.0", 10000), BaseHTTPRequestHandler)
+    server.serve_forever()
+
+threading.Thread(target=run, daemon=True).start()
+
+# =========================
 # 🚀 READY
 # =========================
 @bot.event
@@ -67,7 +78,7 @@ async def on_ready():
         print("Slash error:", e)
 
 # =========================
-# 👋 WELCOME (NO TOCADO)
+# 👋 WELCOME PRO
 # =========================
 @bot.event
 async def on_member_join(member):
@@ -78,35 +89,53 @@ async def on_member_join(member):
         role = member.guild.get_role(role_id)
         if role:
             try:
-                await member.add_roles(role, reason="Autorole system")
+                await member.add_roles(role)
             except Exception as e:
                 print("Autorole error:", e)
 
     channel = member.guild.get_channel(1500703841518223375)
 
     if channel:
+
         embed = discord.Embed(
-            title="🔥 Bienvenido a Guate Xiter 🔥",
+            title="🔥 BIENVENIDO A GUATE XITER 🔥",
             description=f"""
-Welcome {member.mention} to MIEMBROS GUATE XITER!
+Welcome {member.mention} to **MIEMBROS GUATE XITER**
 
-🔥 Somos familia 💯  
-🚀 Aquí se sube todo  
-🏆 Aquí se domina  
-💀 Aquí no hay debilidad  
+GUATE XITER CHEATS 💀
 
-⚔️ Siempre activos  
+🔥 Aquí no somos solo un clan… somos familia 💯  
+Nos apoyamos, subimos juntos y hacemos mrd a todo lo que se cruce 😈  
+
+Si entraste es porque tienes nivel.  
+Actívate, respeta y demuestra por qué estás aquí.
+
+🚀 Aquí se viene a subir TODO  
+🏆 Aquí se viene a llegar al TOP  
+💀 Aquí se viene a dominar  
+
+🔥 Siempre activos  
+⚔️ Siempre competitivos  
 🤝 Siempre en equipo  
+
+No dejamos a nadie atrás…  
+pero tampoco cargamos peso muerto.
+
+💀 Guate Xiter no es un clan… es otro nivel.
 """,
             color=0xff0000
         )
 
-        embed.set_image(url="https://images-ext-1.discordapp.net/external/ch2lkaZJmmSwYBMyGG-Iqo2tZSdovpxc5kxVD6nheAo/https/i.postimg.cc/nV2JGZmr/file-00000000c9ec71f59259d589e645e4e1.png")
+        embed.set_image(
+            url="https://i.postimg.cc/nV2JGZmr/file-00000000c9ec71f59259d589e645e4e1.png"
+        )
 
-        await channel.send(content=member.mention, embed=embed)
+        embed.set_footer(text="🔥 GUATE XITER • WELCOME SYSTEM")
+
+        await channel.send(content=f"👋 Welcome {member.mention}", embed=embed)
 
 # =========================
-# 📊 INFO (FIX ONLINE REAL)
+# 📊 INFO
 # =========================
 @bot.command()
 async def info(ctx):
@@ -255,6 +284,7 @@ class Panel(discord.ui.View):
     async def info(self, interaction, button):
 
         g = interaction.guild
+
         online = sum(
             1 for m in g.members
             if m.status in (discord.Status.online, discord.Status.idle, discord.Status.dnd)
