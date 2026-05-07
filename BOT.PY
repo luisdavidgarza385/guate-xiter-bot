@@ -9,8 +9,8 @@ from collections import defaultdict
 # =========================
 # 🔐 TOKEN
 # =========================
+import os
 TOKEN = os.getenv("DISCORD_TOKEN")
-
 # =========================
 # 🤖 INTENTS (FIX TOTAL)
 # =========================
