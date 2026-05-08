@@ -112,7 +112,7 @@ async def on_member_join(member):
         if role:
             await member.add_roles(role)
 
-    # LOG
+    # LOG JOIN
     log = member.guild.get_channel(LOG_CHANNEL_ID)
     if log:
         await log.send(f"📥 JOIN: {member}")
@@ -123,18 +123,15 @@ async def on_member_join(member):
     if channel:
         embed = discord.Embed(
             title="🔥 BIENVENIDO A GUATE XITER CHEATS 🔥",
-            description=f"""
-{member.mention}
-
+            description="""
 🔥 Bienvenido a Guate Xiter 🔥  
 Aquí no somos solo un clan… somos familia 💯  
 Nos apoyamos, subimos juntos y hacemos mrd 😈  
 
-🚀 Aquí se viene a subir TODO  
-🏆 Aquí se viene a llegar al TOP  
-💀 Aquí se viene a dominar  
+🚀 Subir TODO  
+🏆 Llegar al TOP  
+💀 Dominar  
 
-🔥 Siempre activos  
 ⚔️ Siempre competitivos  
 🤝 Siempre en equipo  
 
@@ -157,13 +154,12 @@ async def on_message(message):
 
     uid = str(message.author.id)
 
-    # XP
     xp[uid] += 5
     if xp[uid] % 100 == 0:
         level[uid] += 1
 
-    # ================= ANTI SPAM =================
     now = datetime.datetime.utcnow().timestamp()
+
     spam[uid].append(now)
     spam[uid] = [t for t in spam[uid] if now - t < 5]
 
@@ -171,7 +167,6 @@ async def on_message(message):
         await message.delete()
         return
 
-    # ================= ANTI LINK =================
     if "http" in message.content or "discord.gg" in message.content:
         await message.delete()
         return
@@ -204,7 +199,7 @@ async def on_member_ban(guild, user):
 async def on_member_remove(member):
     ch = member.guild.get_channel(LOG_CHANNEL_ID)
     if ch:
-        await ch.send(f"👢 LEAVE: {member}")
+        await ch.send(f"👢 LEAVE/KICK: {member}")
 
 @bot.event
 async def on_voice_state_update(member, before, after):
@@ -226,7 +221,7 @@ async def info(interaction: discord.Interaction):
     )
 
     await interaction.response.send_message(
-        f"👥 {g.member_count}\n🟢 {online}\n🤖 {sum(m.bot for m in g.members)}"
+        f"👥 Miembros: {g.member_count}\n🟢 Online: {online}\n🤖 Bots: {sum(m.bot for m in g.members)}"
     )
 
 # =========================
@@ -257,7 +252,7 @@ async def warn(interaction: discord.Interaction, member: discord.Member, reason:
     await interaction.response.send_message(f"⚠️ Warn a {member}")
 
 # =========================
-# 👑 VERIFY FIX
+# 👑 VERIFY
 # =========================
 class Verify(discord.ui.View):
 
@@ -277,7 +272,7 @@ async def verify(interaction: discord.Interaction):
     await interaction.response.send_message("👑 Verifícate", view=Verify())
 
 # =========================
-# 🖼️ AVATAR PNG
+# 🖼️ AVATAR
 # =========================
 @bot.tree.command(name="avatar")
 async def avatar(interaction: discord.Interaction, member: discord.Member = None):
