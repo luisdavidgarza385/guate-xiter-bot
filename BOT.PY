@@ -6,7 +6,10 @@ import os
 import datetime
 import asyncio
 from collections import defaultdict
-
+welcome_cache = set()
+async def clear_welcome_cache(user_id):
+    await asyncio.sleep(60)
+    welcome_cache.discard(user_id)
 # =========================
 # TOKEN
 # =========================
@@ -100,7 +103,20 @@ async def on_ready():
 @bot.event
 async def on_member_join(member):
 
+    # =========================
+    # FIX ANTI DUPLICADO REAL
+    # =========================
+    if member.id in welcome_cache:
+        return
+
+    welcome_cache.add(member.id)
+
+    # limpiar cache después de 60 segundos
+    asyncio.create_task(clear_welcome_cache(member.id))
+
+    # =========================
     # ANTI RAID
+    # =========================
     now = datetime.datetime.utcnow().timestamp()
     join_tracker.append(now)
     join_tracker[:] = [t for t in join_tracker if now - t < 10]
@@ -112,7 +128,9 @@ async def on_member_join(member):
             except:
                 pass
 
-    # AUTO ROLE FIX
+    # =========================
+    # AUTO ROLE FIX (NO TOCADO)
+    # =========================
     tipo = "bot" if member.bot else "user"
     roles = data["autoroles"].get(tipo, [])
 
@@ -127,7 +145,9 @@ async def on_member_join(member):
         except:
             pass
 
-    # WELCOME (1 SOLO MENSAJE)
+    # =========================
+    # WELCOME
+    # =========================
     ch = member.guild.get_channel(LOG_CHANNEL_ID)
 
     if ch:
