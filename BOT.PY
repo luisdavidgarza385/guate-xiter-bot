@@ -6,10 +6,13 @@ import os
 import datetime
 import asyncio
 from collections import defaultdict
+
 welcome_cache = set()
+
 async def clear_welcome_cache(user_id):
     await asyncio.sleep(60)
     welcome_cache.discard(user_id)
+
 # =========================
 # TOKEN
 # =========================
@@ -103,20 +106,13 @@ async def on_ready():
 @bot.event
 async def on_member_join(member):
 
-    # =========================
-    # FIX ANTI DUPLICADO REAL
-    # =========================
     if member.id in welcome_cache:
         return
 
     welcome_cache.add(member.id)
-
-    # limpiar cache después de 60 segundos
     asyncio.create_task(clear_welcome_cache(member.id))
 
-    # =========================
     # ANTI RAID
-    # =========================
     now = datetime.datetime.utcnow().timestamp()
     join_tracker.append(now)
     join_tracker[:] = [t for t in join_tracker if now - t < 10]
@@ -129,7 +125,7 @@ async def on_member_join(member):
                 pass
 
     # =========================
-    # AUTO ROLE FIX (NO TOCADO)
+    # AUTO ROLE 🔥 ARREGLADO PRO
     # =========================
     tipo = "bot" if member.bot else "user"
     roles = data["autoroles"].get(tipo, [])
@@ -139,9 +135,9 @@ async def on_member_join(member):
 
     for role_id in roles:
         try:
-            role = member.guild.get_role(int(role_id))
+            role = discord.utils.get(member.guild.roles, id=int(role_id))
             if role:
-                await member.add_roles(role)
+                await member.add_roles(role, reason="Autorole system")
         except:
             pass
 
