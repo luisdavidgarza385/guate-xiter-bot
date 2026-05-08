@@ -3,20 +3,19 @@ from discord.ext import commands
 from discord import app_commands
 import json
 import os
-from collections import defaultdict
 import datetime
 import asyncio
+from collections import defaultdict
 
 # =========================
-# 🔐 TOKEN
+# TOKEN
 # =========================
 TOKEN = os.getenv("DISCORD_TOKEN")
-
 if not TOKEN:
-    raise ValueError("❌ No se encontró DISCORD_TOKEN")
+    raise ValueError("❌ No TOKEN")
 
 # =========================
-# 🤖 INTENTS
+# INTENTS
 # =========================
 intents = discord.Intents.default()
 intents.members = True
@@ -28,25 +27,28 @@ intents.guilds = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 # =========================
-# 💾 DATA
+# DATA
 # =========================
 FILE = "data.json"
 
 def load():
     try:
-        with open(FILE, "r") as f:
+        with open(FILE,"r") as f:
             return json.load(f)
     except:
-        return {"warns": {}, "autoroles": {"user": None, "bot": None}}
+        return {
+            "warns": {},
+            "autoroles": {"user": [], "bot": []}
+        }
 
 def save():
-    with open(FILE, "w") as f:
-        json.dump(data, f, indent=4)
+    with open(FILE,"w") as f:
+        json.dump(data,f,indent=4)
 
 data = load()
 
 # =========================
-# 📊 SYSTEMS
+# SYSTEMS
 # =========================
 xp = defaultdict(int)
 level = defaultdict(int)
@@ -56,7 +58,7 @@ join_tracker = []
 LOG_CHANNEL_ID = 1500703841518223375
 
 # =========================
-# 🚀 STATUS BOT
+# STATUS (MIEMBROS + ONLINE)
 # =========================
 async def status_loop():
     await bot.wait_until_ready()
@@ -68,33 +70,34 @@ async def status_loop():
         online = sum(
             1 for g in bot.guilds
             for m in g.members
-            if m.status in (discord.Status.online, discord.Status.idle, discord.Status.dnd)
+            if m.status != discord.Status.offline
         )
 
-        activity = discord.Activity(
-            type=discord.ActivityType.watching,
-            name=f"{total} miembros | {online} online"
+        await bot.change_presence(
+            activity=discord.Activity(
+                type=discord.ActivityType.watching,
+                name=f"{total} miembros | {online} online"
+            )
         )
-
-        await bot.change_presence(status=discord.Status.online, activity=activity)
 
         await asyncio.sleep(60)
 
 # =========================
-# 🚀 READY
+# READY
 # =========================
 @bot.event
 async def on_ready():
-    print(f"Bot activo como {bot.user}")
+    print(f"BOT ACTIVO {bot.user}")
     await bot.tree.sync()
     bot.loop.create_task(status_loop())
 
 # =========================
-# 🛡️ ANTI RAID
+# WELCOME + AUTO ROLE
 # =========================
 @bot.event
 async def on_member_join(member):
 
+    # ANTI RAID SIMPLE
     now = datetime.datetime.utcnow().timestamp()
     join_tracker.append(now)
     join_tracker[:] = [t for t in join_tracker if now - t < 10]
@@ -103,48 +106,37 @@ async def on_member_join(member):
         for c in member.guild.text_channels:
             await c.set_permissions(member.guild.default_role, send_messages=False)
 
-    # AUTOROLE
+    # AUTO ROLE
     tipo = "bot" if member.bot else "user"
-    role_id = data["autoroles"].get(tipo)
+    roles = data["autoroles"].get(tipo, [])
 
-    if role_id:
+    for role_id in roles:
         role = member.guild.get_role(role_id)
         if role:
             await member.add_roles(role)
 
-    # LOG JOIN
-    log = member.guild.get_channel(LOG_CHANNEL_ID)
-    if log:
-        await log.send(f"📥 JOIN: {member}")
-
     # WELCOME
-    channel = member.guild.get_channel(LOG_CHANNEL_ID)
-
-    if channel:
+    ch = member.guild.get_channel(LOG_CHANNEL_ID)
+    if ch:
         embed = discord.Embed(
-            title="🔥 BIENVENIDO A GUATE XITER CHEATS 🔥",
-            description="""
-🔥 Bienvenido a Guate Xiter 🔥  
-Aquí no somos solo un clan… somos familia 💯  
-Nos apoyamos, subimos juntos y hacemos mrd 😈  
+            title="🔥 BIENVENIDO A GUATE XITER 🔥",
+            description=f"""
+👤 {member.mention}
 
-🚀 Subir TODO  
-🏆 Llegar al TOP  
-💀 Dominar  
+💀 Bienvenido crack  
+🚀 Subir nivel  
+🏆 Competir  
+⚔️ Team work  
 
-⚔️ Siempre competitivos  
-🤝 Siempre en equipo  
-
-💀 GUATE XITER ES OTRO NIVEL 💀
+💀 GUATE XITER 💀
 """,
             color=0xff0000
         )
-
-        embed.set_image(url="https://i.postimg.cc/nV2JGZmr/file-00000000c9ec71f59259d589e645e4e1.png")
-        await channel.send(embed=embed)
+        embed.set_thumbnail(url=member.display_avatar.url)
+        await ch.send(embed=embed)
 
 # =========================
-# 📊 XP + ANTI SPAM + ANTI LINK
+# XP + ANTI SPAM + LINK
 # =========================
 @bot.event
 async def on_message(message):
@@ -174,128 +166,171 @@ async def on_message(message):
     await bot.process_commands(message)
 
 # =========================
-# 📢 LOGS COMPLETOS
+# CLEAR
 # =========================
-@bot.event
-async def on_message_delete(message):
-    if message.author.bot: return
-    ch = message.guild.get_channel(LOG_CHANNEL_ID)
-    if ch:
-        await ch.send(f"🧹 DELETE: {message.author} → {message.content}")
-
-@bot.event
-async def on_message_edit(before, after):
-    ch = before.guild.get_channel(LOG_CHANNEL_ID)
-    if ch:
-        await ch.send(f"✏ EDIT: {before.author}\n{before.content} ➜ {after.content}")
-
-@bot.event
-async def on_member_ban(guild, user):
-    ch = guild.get_channel(LOG_CHANNEL_ID)
-    if ch:
-        await ch.send(f"🔨 BAN: {user}")
-
-@bot.event
-async def on_member_remove(member):
-    ch = member.guild.get_channel(LOG_CHANNEL_ID)
-    if ch:
-        await ch.send(f"👢 LEAVE/KICK: {member}")
-
-@bot.event
-async def on_voice_state_update(member, before, after):
-    ch = member.guild.get_channel(LOG_CHANNEL_ID)
-    if ch:
-        await ch.send(f"🎤 VOICE: {member}")
+@bot.tree.command(name="clear")
+@app_commands.checks.has_permissions(manage_messages=True)
+async def clear(interaction: discord.Interaction, amount: int):
+    await interaction.channel.purge(limit=amount)
+    await interaction.response.send_message(f"🧹 {amount} mensajes borrados", ephemeral=True)
 
 # =========================
-# 📊 INFO
+# BAN / KICK / TIMEOUT
+# =========================
+@bot.tree.command(name="ban")
+@app_commands.checks.has_permissions(ban_members=True)
+async def ban(interaction, member: discord.Member):
+    await member.ban()
+    await interaction.response.send_message("🔨 baneado")
+
+@bot.tree.command(name="kick")
+@app_commands.checks.has_permissions(kick_members=True)
+async def kick(interaction, member: discord.Member):
+    await member.kick()
+    await interaction.response.send_message("👢 kick")
+
+@bot.tree.command(name="timeout")
+@app_commands.checks.has_permissions(moderate_members=True)
+async def timeout(interaction, member: discord.Member, minutes: int):
+    await member.timeout(datetime.timedelta(minutes=minutes))
+    await interaction.response.send_message("⏳ timeout")
+
+# =========================
+# INFO FULL (MIEMBROS + ONLINE + BOTS + BOOSTS)
 # =========================
 @bot.tree.command(name="info")
-async def info(interaction: discord.Interaction):
+async def info(interaction):
 
     g = interaction.guild
 
-    online = sum(
-        1 for m in g.members
-        if m.status in (discord.Status.online, discord.Status.idle, discord.Status.dnd)
-    )
+    online = sum(1 for m in g.members if m.status != discord.Status.offline)
+    bots = sum(m.bot for m in g.members)
 
-    await interaction.response.send_message(
-        f"👥 Miembros: {g.member_count}\n🟢 Online: {online}\n🤖 Bots: {sum(m.bot for m in g.members)}"
-    )
-
-# =========================
-# 🟢 ONLINE
-# =========================
-@bot.tree.command(name="online")
-async def online(interaction: discord.Interaction):
-
-    online = sum(
-        1 for m in interaction.guild.members
-        if m.status in (discord.Status.online, discord.Status.idle, discord.Status.dnd)
-    )
-
-    await interaction.response.send_message(f"🟢 Online: {online}")
-
-# =========================
-# ⚠️ WARN
-# =========================
-@bot.tree.command(name="warn")
-@app_commands.checks.has_permissions(moderate_members=True)
-async def warn(interaction: discord.Interaction, member: discord.Member, reason: str):
-
-    uid = str(member.id)
-    data["warns"].setdefault(uid, [])
-    data["warns"][uid].append(reason)
-    save()
-
-    await interaction.response.send_message(f"⚠️ Warn a {member}")
-
-# =========================
-# 👑 VERIFY
-# =========================
-class Verify(discord.ui.View):
-
-    @discord.ui.button(label="Verificar", style=discord.ButtonStyle.green)
-    async def verify(self, interaction: discord.Interaction, button):
-
-        role = discord.utils.get(interaction.guild.roles, name="Verificado")
-
-        if not role:
-            return await interaction.response.send_message("❌ No existe rol Verificado", ephemeral=True)
-
-        await interaction.user.add_roles(role)
-        await interaction.response.send_message("✔ Verificado", ephemeral=True)
-
-@bot.tree.command(name="verify")
-async def verify(interaction: discord.Interaction):
-    await interaction.response.send_message("👑 Verifícate", view=Verify())
-
-# =========================
-# 🖼️ AVATAR
-# =========================
-@bot.tree.command(name="avatar")
-async def avatar(interaction: discord.Interaction, member: discord.Member = None):
-
-    member = member or interaction.user
-
-    embed = discord.Embed(title="Avatar", color=0xff0000)
-    embed.set_image(url=member.display_avatar.with_format("png").with_size(1024))
+    embed = discord.Embed(title="📊 INFO SERVER", color=0xff0000)
+    embed.add_field(name="👥 Miembros", value=g.member_count)
+    embed.add_field(name="🟢 Online", value=online)
+    embed.add_field(name="🤖 Bots", value=bots)
+    embed.add_field(name="🚀 Boosts", value=g.premium_subscription_count)
 
     await interaction.response.send_message(embed=embed)
 
 # =========================
-# 📈 RANK
+# ONLINE
 # =========================
-@bot.tree.command(name="rank")
-async def rank(interaction: discord.Interaction, member: discord.Member = None):
+@bot.tree.command(name="online")
+async def online(interaction):
+    online = sum(1 for m in interaction.guild.members if m.status != discord.Status.offline)
+    await interaction.response.send_message(f"🟢 Online: {online}")
+
+# =========================
+# MEMBERS
+# =========================
+@bot.tree.command(name="members")
+async def members(interaction):
+    await interaction.response.send_message(f"👥 {interaction.guild.member_count}")
+
+# =========================
+# BOOSTS
+# =========================
+@bot.tree.command(name="boosts")
+async def boosts(interaction):
+    await interaction.response.send_message(f"🚀 {interaction.guild.premium_subscription_count}")
+
+# =========================
+# PING
+# =========================
+@bot.tree.command(name="ping")
+async def ping(interaction):
+    await interaction.response.send_message(f"🏓 {round(bot.latency*1000)}ms")
+
+# =========================
+# USERINFO
+# =========================
+@bot.tree.command(name="userinfo")
+async def userinfo(interaction, member: discord.Member=None):
 
     member = member or interaction.user
-    uid = str(member.id)
 
-    await interaction.response.send_message(f"📈 XP: {xp[uid]} | Nivel: {level[uid]}")
+    embed = discord.Embed(title="USER INFO")
+    embed.add_field(name="ID", value=member.id)
+    embed.add_field(name="Creado", value=member.created_at)
+
+    await interaction.response.send_message(embed=embed)
 
 # =========================
-# 🚀 RUN
+# AVATAR PNG
+# =========================
+@bot.tree.command(name="avatar")
+async def avatar(interaction, member: discord.Member=None):
+
+    member = member or interaction.user
+
+    embed = discord.Embed()
+    embed.set_image(url=member.display_avatar.url)
+
+    await interaction.response.send_message(embed=embed)
+
+# =========================
+# SERVER BANNER
+# =========================
+@bot.tree.command(name="guildbanner")
+async def guildbanner(interaction):
+
+    g = interaction.guild
+
+    if not g.banner:
+        return await interaction.response.send_message("sin banner")
+
+    embed = discord.Embed()
+    embed.set_image(url=g.banner.url)
+
+    await interaction.response.send_message(embed=embed)
+
+# =========================
+# USER BANNER
+# =========================
+@bot.tree.command(name="banner")
+async def banner(interaction, member: discord.Member=None):
+
+    member = member or interaction.user
+    user = await bot.fetch_user(member.id)
+
+    if not user.banner:
+        return await interaction.response.send_message("sin banner")
+
+    embed = discord.Embed()
+    embed.set_image(url=user.banner.url)
+
+    await interaction.response.send_message(embed=embed)
+
+# =========================
+# AUTOROLE SYSTEM
+# =========================
+@bot.tree.command(name="autorole_add")
+async def autorole_add(interaction, tipo: str):
+
+    if tipo not in ["user","bot"]:
+        return await interaction.response.send_message("user o bot")
+
+    roles = [
+        discord.SelectOption(label=r.name, value=str(r.id))
+        for r in interaction.guild.roles[:25]
+    ]
+
+    class Select(discord.ui.Select):
+        async def callback(self, i):
+
+            data["autoroles"][tipo] = [int(x) for x in self.values]
+            save()
+
+            await i.response.send_message("✔ Autoroles guardados", ephemeral=True)
+
+    view = discord.ui.View()
+    view.add_item(Select(placeholder="selecciona roles", options=roles, min_values=1, max_values=len(roles)))
+
+    await interaction.response.send_message("Selecciona roles:", view=view)
+
+# =========================
+# RUN
 # =========================
 bot.run(TOKEN)
