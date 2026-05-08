@@ -34,12 +34,17 @@ FILE = "data.json"
 def load():
     try:
         with open(FILE,"r") as f:
-            return json.load(f)
+            data = json.load(f)
+
+        if "autoroles" not in data:
+            data["autoroles"] = {"user": [], "bot": []}
+        if "warns" not in data:
+            data["warns"] = {}
+
+        return data
+
     except:
-        return {
-            "warns":{},
-            "autoroles":{"user":[], "bot":[]}
-        }
+        return {"warns":{}, "autoroles":{"user":[], "bot":[]} }
 
 def save():
     with open(FILE,"w") as f:
@@ -58,7 +63,7 @@ join_tracker = []
 LOG_CHANNEL_ID = 1500703841518223375
 
 # =========================
-# STATUS BOT (MIEMBROS + ONLINE)
+# STATUS BOT
 # =========================
 async def status_loop():
     await bot.wait_until_ready()
@@ -89,36 +94,42 @@ async def status_loop():
 async def on_ready():
     print(f"BOT ACTIVO {bot.user}")
     await bot.tree.sync()
-    bot.loop.create_task(status_loop())
+    asyncio.create_task(status_loop())
 
 # =========================
-# WELCOME + AUTO ROLE (ARREGLADO)
+# WELCOME + AUTO ROLE (FIX TOTAL)
 # =========================
 @bot.event
 async def on_member_join(member):
 
-    # ANTI RAID
+    # anti raid
     now = datetime.datetime.utcnow().timestamp()
     join_tracker.append(now)
     join_tracker[:] = [t for t in join_tracker if now - t < 10]
 
     if len(join_tracker) >= 5:
         for c in member.guild.text_channels:
-            await c.set_permissions(member.guild.default_role, send_messages=False)
-
-    # AUTO ROLE
-    tipo = "bot" if member.bot else "user"
-    roles = data["autoroles"].get(tipo, [])
-
-    for role_id in roles:
-        role = member.guild.get_role(role_id)
-        if role:
             try:
-                await member.add_roles(role)
+                await c.set_permissions(member.guild.default_role, send_messages=False)
             except:
                 pass
 
-    # WELCOME
+    # AUTO ROLE FIX
+    tipo = "bot" if member.bot else "user"
+    roles = data["autoroles"].get(tipo, [])
+
+    if not isinstance(roles, list):
+        roles = [roles]
+
+    for role_id in roles:
+        try:
+            role = member.guild.get_role(int(role_id))
+            if role:
+                await member.add_roles(role)
+        except:
+            pass
+
+    # WELCOME SOLO 1 MENSAJE
     ch = member.guild.get_channel(LOG_CHANNEL_ID)
 
     if ch:
@@ -137,6 +148,7 @@ async def on_member_join(member):
             color=0xff0000
         )
         embed.set_thumbnail(url=member.display_avatar.url)
+
         await ch.send(embed=embed)
 
 # =========================
@@ -308,7 +320,7 @@ async def banner(interaction, member: discord.Member=None):
     await interaction.response.send_message(embed=embed)
 
 # =========================
-# AUTO ROLE (ARREGLADO SIN ERROR 10062)
+# AUTOROLE FIX
 # =========================
 class RoleSelect(discord.ui.Select):
     def __init__(self, roles, tipo):
