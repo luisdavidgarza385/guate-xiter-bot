@@ -36,19 +36,17 @@ def load():
         with open(FILE,"r") as f:
             data = json.load(f)
 
-        if "autoroles" not in data:
-            data["autoroles"] = {"user": [], "bot": []}
-        if "warns" not in data:
-            data["warns"] = {}
+        data.setdefault("autoroles", {"user": [], "bot": []})
+        data.setdefault("warns", {})
 
         return data
 
     except:
-        return {"warns":{}, "autoroles":{"user":[], "bot":[]} }
+        return {"warns": {}, "autoroles": {"user": [], "bot": []}}
 
 def save():
     with open(FILE,"w") as f:
-        json.dump(data,f,indent=4)
+        json.dump(data, f, indent=4)
 
 data = load()
 
@@ -97,12 +95,12 @@ async def on_ready():
     asyncio.create_task(status_loop())
 
 # =========================
-# WELCOME + AUTO ROLE (FIX TOTAL)
+# WELCOME + AUTO ROLE (FIXED)
 # =========================
 @bot.event
 async def on_member_join(member):
 
-    # anti raid
+    # ANTI RAID
     now = datetime.datetime.utcnow().timestamp()
     join_tracker.append(now)
     join_tracker[:] = [t for t in join_tracker if now - t < 10]
@@ -129,7 +127,7 @@ async def on_member_join(member):
         except:
             pass
 
-    # WELCOME SOLO 1 MENSAJE
+    # WELCOME (1 SOLO MENSAJE)
     ch = member.guild.get_channel(LOG_CHANNEL_ID)
 
     if ch:
@@ -138,15 +136,28 @@ async def on_member_join(member):
             description=f"""
 👤 {member.mention}
 
-💀 Bienvenido crack  
-🚀 Subir nivel  
-🏆 Competir  
-⚔️ Team work  
+💀 Aquí no jugamos, aquí dominamos
+🚀 Aquí se viene a subir de nivel sin parar
+🏆 Aquí se compite hasta ser leyenda
+⚔️ Aquí se entrena duro o no se sobrevive
 
-💀 GUATE XITER 💀
+🔥 No hay excusas, solo progreso
+💪 Aquí se demuestra quién vale y quién no
+👑 Aquí se forma el verdadero top
+🧠 Estrategia + habilidad = victoria
+
+💀 Si entras, es para ganar
+🚀 Si te quedas, es para crecer
+🏆 Si destacas, es para liderar
+
+⚔️ Solo los activos sobreviven
+🤝 Aquí nadie juega solo, todos somos team
+🔥 Respeto, disciplina y constancia
 """,
             color=0xff0000
         )
+
+        embed.set_image(url="https://i.postimg.cc/nV2JGZmr/file-00000000c9ec71f59259d589e645e4e1.png")
         embed.set_thumbnail(url=member.display_avatar.url)
 
         await ch.send(embed=embed)
