@@ -37,8 +37,8 @@ def load():
             return json.load(f)
     except:
         return {
-            "warns": {},
-            "autoroles": {"user": [], "bot": []}
+            "warns":{},
+            "autoroles":{"user":[], "bot":[]}
         }
 
 def save():
@@ -58,7 +58,7 @@ join_tracker = []
 LOG_CHANNEL_ID = 1500703841518223375
 
 # =========================
-# STATUS (MIEMBROS + ONLINE)
+# STATUS BOT (MIEMBROS + ONLINE)
 # =========================
 async def status_loop():
     await bot.wait_until_ready()
@@ -92,12 +92,12 @@ async def on_ready():
     bot.loop.create_task(status_loop())
 
 # =========================
-# WELCOME + AUTO ROLE
+# WELCOME + AUTO ROLE (ARREGLADO)
 # =========================
 @bot.event
 async def on_member_join(member):
 
-    # ANTI RAID SIMPLE
+    # ANTI RAID
     now = datetime.datetime.utcnow().timestamp()
     join_tracker.append(now)
     join_tracker[:] = [t for t in join_tracker if now - t < 10]
@@ -113,10 +113,14 @@ async def on_member_join(member):
     for role_id in roles:
         role = member.guild.get_role(role_id)
         if role:
-            await member.add_roles(role)
+            try:
+                await member.add_roles(role)
+            except:
+                pass
 
     # WELCOME
     ch = member.guild.get_channel(LOG_CHANNEL_ID)
+
     if ch:
         embed = discord.Embed(
             title="🔥 BIENVENIDO A GUATE XITER 🔥",
@@ -196,7 +200,7 @@ async def timeout(interaction, member: discord.Member, minutes: int):
     await interaction.response.send_message("⏳ timeout")
 
 # =========================
-# INFO FULL (MIEMBROS + ONLINE + BOTS + BOOSTS)
+# INFO
 # =========================
 @bot.tree.command(name="info")
 async def info(interaction):
@@ -258,7 +262,7 @@ async def userinfo(interaction, member: discord.Member=None):
     await interaction.response.send_message(embed=embed)
 
 # =========================
-# AVATAR PNG
+# AVATAR
 # =========================
 @bot.tree.command(name="avatar")
 async def avatar(interaction, member: discord.Member=None):
@@ -304,31 +308,48 @@ async def banner(interaction, member: discord.Member=None):
     await interaction.response.send_message(embed=embed)
 
 # =========================
-# AUTOROLE SYSTEM
+# AUTO ROLE (ARREGLADO SIN ERROR 10062)
 # =========================
+class RoleSelect(discord.ui.Select):
+    def __init__(self, roles, tipo):
+
+        self.tipo = tipo
+
+        options = [
+            discord.SelectOption(label=r.name, value=str(r.id))
+            for r in roles if r.name != "@everyone"
+        ][:25]
+
+        super().__init__(
+            placeholder="Selecciona roles",
+            options=options,
+            min_values=1,
+            max_values=len(options)
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+
+        data["autoroles"][self.tipo] = [int(v) for v in self.values]
+        save()
+
+        await interaction.response.send_message("✔ Autoroles guardados", ephemeral=True)
+
+class RoleView(discord.ui.View):
+    def __init__(self, roles, tipo):
+        super().__init__(timeout=60)
+        self.add_item(RoleSelect(roles, tipo))
+
 @bot.tree.command(name="autorole_add")
-async def autorole_add(interaction, tipo: str):
+async def autorole_add(interaction: discord.Interaction, tipo: str):
 
     if tipo not in ["user","bot"]:
-        return await interaction.response.send_message("user o bot")
+        return await interaction.response.send_message("user o bot", ephemeral=True)
 
-    roles = [
-        discord.SelectOption(label=r.name, value=str(r.id))
-        for r in interaction.guild.roles[:25]
-    ]
-
-    class Select(discord.ui.Select):
-        async def callback(self, i):
-
-            data["autoroles"][tipo] = [int(x) for x in self.values]
-            save()
-
-            await i.response.send_message("✔ Autoroles guardados", ephemeral=True)
-
-    view = discord.ui.View()
-    view.add_item(Select(placeholder="selecciona roles", options=roles, min_values=1, max_values=len(roles)))
-
-    await interaction.response.send_message("Selecciona roles:", view=view)
+    await interaction.response.send_message(
+        "Selecciona roles:",
+        view=RoleView(interaction.guild.roles, tipo),
+        ephemeral=True
+    )
 
 # =========================
 # RUN
