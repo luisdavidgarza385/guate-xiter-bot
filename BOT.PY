@@ -5,6 +5,7 @@ import json
 import os
 from collections import defaultdict
 from datetime import timedelta
+import datetime
 
 # =========================
 # 🔐 TOKEN
@@ -12,7 +13,7 @@ from datetime import timedelta
 TOKEN = os.getenv("DISCORD_TOKEN")
 
 if not TOKEN:
-    raise ValueError("❌ No se encontró DISCORD_TOKEN en variables de entorno")
+    raise ValueError("❌ No se encontró DISCORD_TOKEN")
 
 # =========================
 # 🤖 INTENTS
@@ -46,23 +47,8 @@ def save():
 
 data = load()
 
-# =========================
-# 📊 SYSTEMS
-# =========================
 xp = defaultdict(int)
 level = defaultdict(int)
-
-# =========================
-# 🚀 WEB FIX RENDER
-# =========================
-from http.server import BaseHTTPRequestHandler, HTTPServer
-import threading
-
-def run():
-    server = HTTPServer(("0.0.0.0", 10000), BaseHTTPRequestHandler)
-    server.serve_forever()
-
-threading.Thread(target=run, daemon=True).start()
 
 # =========================
 # 🚀 READY
@@ -75,15 +61,16 @@ async def on_ready():
         await bot.tree.sync()
         print("Slash commands listos")
     except Exception as e:
-        print("Slash error:", e)
+        print("Error slash:", e)
 
 # =========================
-# 👋 WELCOME PRO
+# 👋 WELCOME + AUTOROLE
 # =========================
 @bot.event
 async def on_member_join(member):
 
-    role_id = data["autoroles"].get("bot") if member.bot else data["autoroles"].get("user")
+    tipo = "bot" if member.bot else "user"
+    role_id = data["autoroles"].get(tipo)
 
     if role_id:
         role = member.guild.get_role(role_id)
@@ -96,30 +83,22 @@ async def on_member_join(member):
     channel = member.guild.get_channel(1500703841518223375)
 
     if channel:
-
         embed = discord.Embed(
             title="🔥 BIENVENIDO A GUATE XITER 🔥",
             description=f"""
-Welcome {member.mention} to **MIEMBROS GUATE XITER**
+Welcome {member.mention} to **MIEMBROS GUATE XITER!**
 
-GUATE XITER CHEATS 💀
+🔥 Bienvenido a Guate Xiter 🔥  
+Aquí no somos solo un clan… somos familia 💯  
+Nos apoyamos, subimos juntos y hacemos mrd a todo 😈  
 
-🔥 Aquí no somos solo un clan… somos familia 💯  
-Nos apoyamos, subimos juntos y hacemos mrd a todo lo que se cruce 😈  
-
-Si entraste es porque tienes nivel.  
-Actívate, respeta y demuestra por qué estás aquí.
-
-🚀 Aquí se viene a subir TODO  
-🏆 Aquí se viene a llegar al TOP  
-💀 Aquí se viene a dominar  
+🚀 Subir TODO  
+🏆 Llegar al TOP  
+💀 Dominar  
 
 🔥 Siempre activos  
 ⚔️ Siempre competitivos  
 🤝 Siempre en equipo  
-
-No dejamos a nadie atrás…  
-pero tampoco cargamos peso muerto.
 
 💀 Guate Xiter no es un clan… es otro nivel.
 """,
@@ -130,132 +109,183 @@ pero tampoco cargamos peso muerto.
             url="https://i.postimg.cc/nV2JGZmr/file-00000000c9ec71f59259d589e645e4e1.png"
         )
 
-        embed.set_footer(text="🔥 GUATE XITER • WELCOME SYSTEM")
-
-        await channel.send(content=f"👋 Welcome {member.mention}", embed=embed)
+        await channel.send(embed=embed)
 
 # =========================
 # 📊 INFO
 # =========================
-@bot.command()
-async def info(ctx):
-    g = ctx.guild
+@bot.tree.command(name="info")
+async def info(interaction: discord.Interaction):
+
+    g = interaction.guild
 
     online = sum(
         1 for m in g.members
         if m.status in (discord.Status.online, discord.Status.idle, discord.Status.dnd)
     )
 
-    bots = sum(1 for m in g.members if m.bot)
-
-    await ctx.send(f"""
-📊 INFO SERVER
-
+    await interaction.response.send_message(
+        f"""📊 INFO
 👥 Miembros: {g.member_count}
 🟢 Online: {online}
-🤖 Bots: {bots}
+🤖 Bots: {sum(m.bot for m in g.members)}
 💬 Canales: {len(g.channels)}
-👑 Roles: {len(g.roles)}
-""")
+👑 Roles: {len(g.roles)}"""
+    )
 
-@bot.command()
-async def online(ctx):
+# =========================
+# 🟢 ONLINE
+# =========================
+@bot.tree.command(name="online")
+async def online(interaction: discord.Interaction):
+
     online = sum(
-        1 for m in ctx.guild.members
+        1 for m in interaction.guild.members
         if m.status in (discord.Status.online, discord.Status.idle, discord.Status.dnd)
     )
-    await ctx.send(f"🟢 Online: {online}")
+
+    await interaction.response.send_message(f"🟢 Online: {online}")
 
 # =========================
-# ⚠️ WARN SYSTEM
+# ⚠️ WARN
 # =========================
-@bot.command()
-async def warn(ctx, member: discord.Member, *, reason="sin razón"):
+@bot.tree.command(name="warn")
+@app_commands.checks.has_permissions(moderate_members=True)
+async def warn(interaction: discord.Interaction, member: discord.Member, reason: str = "sin razón"):
+
     uid = str(member.id)
 
     data["warns"].setdefault(uid, [])
     data["warns"][uid].append(reason)
-
     save()
 
-    await ctx.send(f"⚠️ warn a {member.mention}")
+    await interaction.response.send_message(f"⚠️ Warn a {member}")
 
-@bot.command()
-async def warns(ctx, member: discord.Member):
+# =========================
+# ⚠️ WARNS
+# =========================
+@bot.tree.command(name="warns")
+async def warns(interaction: discord.Interaction, member: discord.Member):
+
     uid = str(member.id)
-
     warns_list = data["warns"].get(uid, [])
 
     if not warns_list:
-        return await ctx.send("✅ Sin warns")
+        return await interaction.response.send_message("✅ Sin warns")
 
     text = "\n".join([f"{i+1}. {w}" for i, w in enumerate(warns_list)])
 
-    await ctx.send(f"⚠️ Warns de {member.mention}\n{text}")
+    await interaction.response.send_message(f"⚠️ Warns:\n{text}")
 
 # =========================
 # 🎭 AUTOROLE
 # =========================
-@bot.command()
-async def setautorole(ctx, tipo, role: discord.Role):
+class RoleSelect(discord.ui.Select):
+    def __init__(self, roles, tipo):
+        self.tipo = tipo
+
+        options = [
+            discord.SelectOption(label=r.name, value=str(r.id))
+            for r in roles[:25]
+        ]
+
+        super().__init__(placeholder=f"Selecciona rol {tipo}", options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+
+        role_id = int(self.values[0])
+
+        data["autoroles"][self.tipo] = role_id
+        save()
+
+        await interaction.response.send_message(
+            f"✅ Autorole {self.tipo}: <@&{role_id}>",
+            ephemeral=True
+        )
+
+class RoleView(discord.ui.View):
+    def __init__(self, roles, tipo):
+        super().__init__()
+        self.add_item(RoleSelect(roles, tipo))
+
+@bot.tree.command(name="setautorole")
+async def setautorole(interaction: discord.Interaction, tipo: str):
 
     tipo = tipo.lower()
 
     if tipo not in ["user", "bot"]:
-        return await ctx.send("❌ usa user o bot")
+        return await interaction.response.send_message("❌ usa user o bot")
 
-    data["autoroles"][tipo] = role.id
-    save()
+    view = RoleView(interaction.guild.roles, tipo)
 
-    await ctx.send("✅ Autorole guardado")
-
-# =========================
-# 🧹 CLEAR
-# =========================
-@bot.command()
-async def clear(ctx, amount: int):
-    await ctx.channel.purge(limit=amount)
-    await ctx.send(f"🧹 {amount} eliminados", delete_after=3)
+    await interaction.response.send_message(
+        f"🎭 Selecciona autorole {tipo}",
+        view=view
+    )
 
 # =========================
-# 🔒 LOCK / UNLOCK
+# 🧹 CLEAR (FIX)
 # =========================
-@bot.command()
-async def lockdown(ctx):
-    overwrite = ctx.channel.overwrites_for(ctx.guild.default_role)
+@bot.tree.command(name="clear")
+@app_commands.checks.has_permissions(manage_messages=True)
+async def clear(interaction: discord.Interaction, amount: int):
+
+    await interaction.response.defer(ephemeral=True)
+
+    await interaction.channel.purge(limit=amount)
+
+    await interaction.followup.send(f"🧹 Eliminados {amount}")
+
+# =========================
+# 🔒 LOCK
+# =========================
+@bot.tree.command(name="lock")
+@app_commands.checks.has_permissions(manage_channels=True)
+async def lock(interaction: discord.Interaction):
+
+    overwrite = interaction.channel.overwrites_for(interaction.guild.default_role)
     overwrite.send_messages = False
-    await ctx.channel.set_permissions(ctx.guild.default_role, overwrite=overwrite)
-    await ctx.send("🔒 lock")
 
-@bot.command()
-async def unlock(ctx):
-    overwrite = ctx.channel.overwrites_for(ctx.guild.default_role)
+    await interaction.channel.set_permissions(interaction.guild.default_role, overwrite=overwrite)
+
+    await interaction.response.send_message("🔒 lock")
+
+# =========================
+# 🔓 UNLOCK
+# =========================
+@bot.tree.command(name="unlock")
+@app_commands.checks.has_permissions(manage_channels=True)
+async def unlock(interaction: discord.Interaction):
+
+    overwrite = interaction.channel.overwrites_for(interaction.guild.default_role)
     overwrite.send_messages = True
-    await ctx.channel.set_permissions(ctx.guild.default_role, overwrite=overwrite)
-    await ctx.send("🔓 unlock")
+
+    await interaction.channel.set_permissions(interaction.guild.default_role, overwrite=overwrite)
+
+    await interaction.response.send_message("🔓 unlock")
 
 # =========================
 # 🖼️ AVATAR
 # =========================
-@bot.command()
-async def avatar(ctx, member: discord.Member = None):
-    member = member or ctx.author
-    await ctx.send(member.display_avatar.url)
+@bot.tree.command(name="avatar")
+async def avatar(interaction: discord.Interaction, member: discord.Member = None):
+
+    member = member or interaction.user
+
+    await interaction.response.send_message(member.display_avatar.url)
 
 # =========================
 # 📈 RANK
 # =========================
-@bot.command()
-async def rank(ctx, member: discord.Member = None):
-    member = member or ctx.author
+@bot.tree.command(name="rank")
+async def rank(interaction: discord.Interaction, member: discord.Member = None):
+
+    member = member or interaction.user
     uid = str(member.id)
 
-    await ctx.send(f"""
-📈 Rank de {member}
-
-XP: {xp[uid]}
-Nivel: {level[uid]}
-""")
+    await interaction.response.send_message(
+        f"📈 XP: {xp[uid]} | Nivel: {level[uid]}"
+    )
 
 # =========================
 # 👑 VERIFY
@@ -271,9 +301,10 @@ class Verify(discord.ui.View):
             await interaction.user.add_roles(role)
             await interaction.response.send_message("✔ verificado", ephemeral=True)
 
-@bot.command()
-async def verify(ctx):
-    await ctx.send("👑 Verifícate", view=Verify())
+@bot.tree.command(name="verify")
+async def verify(interaction: discord.Interaction):
+
+    await interaction.response.send_message("👑 Verifícate", view=Verify())
 
 # =========================
 # 📌 PANEL
@@ -290,56 +321,40 @@ class Panel(discord.ui.View):
             if m.status in (discord.Status.online, discord.Status.idle, discord.Status.dnd)
         )
 
-        await interaction.response.send_message(f"""
-📊 PANEL
+        await interaction.response.send_message(
+            f"👥 {g.member_count}\n🟢 {online}",
+            ephemeral=True
+        )
 
-👥 {g.member_count}
-🟢 {online}
-👑 {len(g.roles)}
-💬 {len(g.channels)}
-""", ephemeral=True)
+@bot.tree.command(name="panel")
+async def panel(interaction: discord.Interaction):
 
-@bot.command()
-async def panel(ctx):
-    await ctx.send("📌 Panel", view=Panel())
+    await interaction.response.send_message("📌 Panel", view=Panel())
 
 # =========================
-# 💀 SLASH COMMANDS
+# 💀 MODERACIÓN
 # =========================
 @bot.tree.command(name="ban")
 @app_commands.checks.has_permissions(ban_members=True)
 async def ban(interaction: discord.Interaction, member: discord.Member, reason: str = "sin razón"):
+
     await member.ban(reason=reason)
-    await interaction.response.send_message(f"🔨 Baneado {member}")
+    await interaction.response.send_message(f"🔨 baneado {member}")
 
 @bot.tree.command(name="kick")
 @app_commands.checks.has_permissions(kick_members=True)
 async def kick(interaction: discord.Interaction, member: discord.Member):
+
     await member.kick()
-    await interaction.response.send_message(f"👢 Kick {member}")
+    await interaction.response.send_message(f"👢 kick {member}")
 
 @bot.tree.command(name="timeout")
 @app_commands.checks.has_permissions(moderate_members=True)
 async def timeout(interaction: discord.Interaction, member: discord.Member, minutes: int):
 
-    await member.timeout(
-        discord.utils.utcnow() + timedelta(minutes=minutes)
-    )
+    await member.timeout(discord.utils.utcnow() + timedelta(minutes=minutes))
 
-    await interaction.response.send_message(f"⏱️ Muted {member}")
-
-@bot.tree.command(name="info")
-async def info_slash(interaction: discord.Interaction):
-    g = interaction.guild
-
-    online = sum(
-        1 for m in g.members
-        if m.status in (discord.Status.online, discord.Status.idle, discord.Status.dnd)
-    )
-
-    await interaction.response.send_message(
-        f"👥 {g.member_count}\n🟢 {online}\n👑 {len(g.roles)}"
-    )
+    await interaction.response.send_message("⏱️ timeout aplicado")
 
 # =========================
 # 🚀 RUN
